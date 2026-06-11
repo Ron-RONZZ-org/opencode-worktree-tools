@@ -21,7 +21,9 @@ Global OpenCode plugin for **isolated git worktrees** — rewritten from [openco
 | Tools | Added `worktreeList`; camelCase tool names matching git tools |
 | Windows | First-class Windows Terminal + cmd fallback |
 
-## Install
+## For humans — quick start
+
+### Install
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\install.ps1
@@ -33,7 +35,19 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 
 Restart OpenCode after install.
 
-## Configuration
+### What gets installed
+
+| Path | Purpose |
+|------|---------|
+| `~/.config/opencode/plugins/opencode-worktree-tools/index.ts` | Plugin entrypoint |
+| `~/.config/opencode/plugins/opencode-worktree-tools/*.ts` | Helper modules |
+| `~/.config/opencode/commands/worktree-*.md` | Slash commands |
+
+OpenCode auto-loads files directly under `~/.config/opencode/plugins/`. This
+plugin uses a subdirectory because it has helper modules; only `index.ts` should
+be registered as the plugin entrypoint.
+
+### Configuration
 
 Auto-created at `.opencode/worktree.jsonc`:
 
@@ -53,13 +67,56 @@ Auto-created at `.opencode/worktree.jsonc`:
 
 Worktrees are stored at `~/.local/share/opencode/worktree/<project-id>/<branch>/` by default.
 
-## Verify
+### Verify
 
 ```bash
 opencode run "call worktreeList and show the result"
 ```
 
 In TUI: `/worktree-list`
+
+## For AI agents — operating instructions
+
+<!-- AGENT_README: opencode-worktree-tools v1.0 -->
+
+You have **worktree\*** plugin tools for isolated git worktrees. Prefer them
+over raw `git worktree` shell commands because they also track OpenCode session
+state, config sync, terminal launch, and cleanup hooks.
+
+### Decision: when to USE worktree*
+
+| Task | Tool |
+|------|------|
+| Create isolated branch/session | `worktreeCreate` |
+| Remove current worktree session safely | `worktreeDelete` |
+| Inspect plugin-managed sessions | `worktreeList` |
+
+### Decision: when NOT to use
+
+| Situation | Use instead |
+|-----------|-------------|
+| Simple status/diff/commit | `git*` tools |
+| User wants to edit current checkout only | Stay in current worktree |
+| Destructive cleanup without confirmation | Ask first |
+| Non-git project | Do not create worktrees |
+
+### Standard workflow
+
+```
+worktreeList
+  → worktreeCreate({ branch: "feature/name" })
+  → work in spawned OpenCode session
+  → worktreeDelete({ reason: "finished" })
+```
+
+### Rules
+
+1. Use `worktreeCreate` instead of raw `git worktree add`
+2. Use `worktreeDelete` instead of raw `git worktree remove`
+3. Check `.opencode/worktree.jsonc` for copy/symlink hooks before creating
+4. Keep helper modules under `plugins/opencode-worktree-tools/`; only `index.ts` is the plugin entrypoint
+
+<!-- END_AGENT_README -->
 
 ## License
 
