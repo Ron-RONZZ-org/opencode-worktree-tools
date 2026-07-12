@@ -8,7 +8,7 @@ import {
   clearPendingDelete,
   getAllSessions,
   getPendingDelete,
-  getSession,
+  getSessionByPath,
   initStateDb,
   removeSession,
   setPendingDelete,
@@ -194,35 +194,12 @@ Config: .opencode/worktree.jsonc (\`newTerminal\`, \`preserveHistory\`, sync, ho
             await runHooks(worktreePath, config.hooks.postCreate, (msg) => log.info(msg));
           }
 
-          // Create the worktree session (fork with history or fresh create)
-          let newSessionId: string;
-          let spawnMethodDesc = config.preserveHistory ? "forked" : "created";
-
-          if (config.preserveHistory) {
-            const forked = await client.session.fork({ path: { id: toolCtx.sessionID }, body: {} });
-            const forkedSession = forked.data;
-            if (!forkedSession?.id) {
-              return `Worktree created at ${worktreePath}, but session ${spawnMethodDesc} failed. Run opencode manually in that directory.`;
-            }
-            newSessionId = forkedSession.id;
-          } else {
-            // Truly independent session — no parentID to avoid linking parent context
-            const created = await client.session.create({
-              body: { title: args.branch },
-              query: { directory: worktreePath },
-            });
-            const createdSession = created.data;
-            if (!createdSession?.id) {
-              return `Worktree created at ${worktreePath}, but session ${spawnMethodDesc} failed. Run opencode manually in that directory.`;
-            }
-            newSessionId = createdSession.id;
-          }
-
-          const launchArgv = buildOpenCodeLaunchArgv(newSessionId);
+          // Launch opencode directly in the worktree directory (no --session flag).
+          // This lets opencode create a fresh natural session, avoiding subagent view.
+          const launchArgv = buildOpenCodeLaunchArgv(worktreePath);
           const terminalResult = await openTerminal(worktreePath, launchArgv, args.branch, config.newTerminal);
 
           if (!terminalResult.success) {
-            await client.session.delete({ path: { id: newSessionId } }).catch(() => {});
             return [
               `Worktree created at ${worktreePath}`,
               `Terminal spawn failed: ${terminalResult.error ?? "unknown error"}`,
@@ -231,7 +208,7 @@ Config: .opencode/worktree.jsonc (\`newTerminal\`, \`preserveHistory\`, sync, ho
           }
 
           addSession(database, {
-            id: newSessionId,
+            id: `wt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, // placeholder ID
             branch: args.branch,
             path: worktreePath,
             createdAt: new Date().toISOString(),
@@ -242,7 +219,6 @@ Config: .opencode/worktree.jsonc (\`newTerminal\`, \`preserveHistory\`, sync, ho
           return [
             `Worktree created at ${worktreePath}`,
             `Branch: ${args.branch}`,
-            `Session: ${newSessionId} (${spawnMethodDesc})`,
             `Opened in ${terminalDesc}.`,
           ].join("\n");
         },
@@ -257,7 +233,22 @@ Config: .opencode/worktree.jsonc (\`newTerminal\`, \`preserveHistory\`, sync, ho
         async execute(_args, toolCtx) {
           if (!database) return "Not in a git repository.";
 
-          const session = getSession(database, toolCtx?.sessionID ?? "");
+          // Find worktree by matching the current session's directory
+          // (we no longer pre-create sessions, so lookup by path instead of ID)
+          let worktreePath: string | null = null;
+          try {
+            const sessionInfo = await client.session.get({ path: { id: toolCtx.sessionID } });
+            const dir = sessionInfo.data?.directory;
+            if (dir) worktreePath = dir;
+          } catch {
+            // fall through
+          }
+
+          if (!worktreePath) {
+            return "No worktree associated with this session. Only worktree sessions created via worktreeCreate can be deleted.";
+          }
+
+          const session = getSessionByPath(database, worktreePath);
           if (!session) {
             return "No worktree associated with this session. Only worktree sessions created via worktreeCreate can be deleted.";
           }

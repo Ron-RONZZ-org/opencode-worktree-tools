@@ -374,6 +374,6 @@ export async function openTerminal(
   return openUnixTerminal(cwd, argv, newTerminal);
 }
 
-export function buildOpenCodeLaunchArgv(sessionId: string): string[] {
-  return ["opencode", "--session", sessionId];
+export function buildOpenCodeLaunchArgv(worktreePath: string): string[] {
+  return ["opencode", worktreePath];
 }
