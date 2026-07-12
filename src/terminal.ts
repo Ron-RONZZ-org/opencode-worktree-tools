@@ -70,8 +70,12 @@ async function detectParentTerminal(): Promise<string | null> {
 }
 
 function wrapBashSelfCleanup(script: string): string {
+  // Preserve the full PATH from the parent process — spawned shells (gnome-terminal --tab,
+  // tmux split-window, etc.) may not inherit it due to non-interactive login-shell profiles.
+  const pathExport = `export PATH="${escapeBash(process.env.PATH || "/usr/bin:/bin")}"`;
   return `#!/bin/bash
 trap 'rm -f "$0"' EXIT INT TERM
+${pathExport}
 ${script}`;
 }
 

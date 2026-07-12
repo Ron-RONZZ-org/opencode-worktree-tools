@@ -206,8 +206,9 @@ Config: .opencode/worktree.jsonc (\`newTerminal\`, \`preserveHistory\`, sync, ho
             }
             newSessionId = forkedSession.id;
           } else {
+            // Truly independent session — no parentID to avoid linking parent context
             const created = await client.session.create({
-              body: { parentID: toolCtx.sessionID, title: args.branch },
+              body: { title: args.branch },
               query: { directory: worktreePath },
             });
             const createdSession = created.data;
