@@ -40,7 +40,7 @@ const DEFAULT_CONFIG_TEMPLATE = `{
 }
 `;
 
-/** Strip // and /* */ comments from JSONC (simple, sufficient for config files). */
+/** Strip // and /* comments from JSONC (simple, sufficient for config files). */
 function stripJsoncComments(text: string): string {
   let out = "";
   let i = 0;
